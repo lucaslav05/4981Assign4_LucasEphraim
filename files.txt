@@ -1,1 +1,1 @@
-server src/server.c pthread
+server src/server.c pthread gdbm_compat
