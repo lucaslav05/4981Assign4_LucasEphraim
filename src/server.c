@@ -99,6 +99,7 @@ int main(void)
     handle_request_t   handle_request;
     pid_t              monitor_pid;
     int                server_fd;
+    int                opt = 1;
     struct sockaddr_in server_addr;
 
     // Create server socket
@@ -108,6 +109,21 @@ int main(void)
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
+
+    // Set socket options to reuse address
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        exit(EXIT_FAILURE);
+    }
+
+#ifdef SO_REUSEPORT
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
+    {
+        perror("setsockopt(SO_REUSEPORT) failed");
+        exit(EXIT_FAILURE);
+    }
+#endif
 
     server_addr.sin_family      = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
