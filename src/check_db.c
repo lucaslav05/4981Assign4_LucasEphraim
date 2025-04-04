@@ -8,20 +8,21 @@
 #include <string.h>
 
 int main() {
-    char key_str[] = "post_data";
-    datum key = { key_str, (int)strlen(key_str) };
-
     DBM *db = dbm_open("../build/post_data", O_RDONLY, 0666);
     if (!db) {
         perror("Failed to open ndbm database");
         return 1;
     }
 
-    datum value = dbm_fetch(db, key);
-    if (value.dptr) {
-        printf("Stored POST data: %.*s\n", value.dsize, value.dptr);
-    } else {
-        printf("No data found in database.\n");
+    datum key = dbm_firstkey(db);
+    while (key.dptr != NULL) {
+        datum value = dbm_fetch(db, key);
+        if (value.dptr) {
+            printf("Key: %.*s\n", key.dsize, key.dptr);
+            printf("Value: %.*s\n\n", value.dsize, value.dptr);
+        }
+
+        key = dbm_nextkey(db);
     }
 
     dbm_close(db);

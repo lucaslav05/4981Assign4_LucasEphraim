@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <ndbm.h>
+#include <time.h>
 
 #define MEDIA_FOLDER "../media/"
 
@@ -109,14 +110,28 @@ void handle_request(int client_fd, DBM *db) {
         serve_file(client_fd, file_path);
     }
     else if (strncmp(buffer, "POST ", 5) == 0) {
-        // Store POST data in ndbm
-        char key_str[] = "post_data";
-        datum key = { key_str, (int)strlen(key_str) };
-        datum value = { buffer, (int)bytes_read };
-        if (dbm_store(db, key, value, DBM_REPLACE) < 0) {
-            write(client_fd, "HTTP/1.1 500 Internal Server Error\r\n\r\n", 36);
-            return;
+        datum key;
+        datum value;
+        time_t now = time(NULL);
+        char key_str[64];
+        snprintf(key_str, sizeof(key_str), "post_%ld", now);
+
+        key.dptr = key_str;
+        key.dsize = (int)strlen(key_str);
+        value.dptr = buffer;
+        value.dsize = (int)bytes_read;
+
+        if (dbm_store(db, key, value, DBM_INSERT) < 0) {
+            // Fallback in case of key collision
+            snprintf(key_str, sizeof(key_str), "post_%ld_%d", now, rand() % 10000);
+            key.dptr = key_str;
+            key.dsize = (int)strlen(key_str);
+            if (dbm_store(db, key, value, DBM_INSERT) < 0) {
+                write(client_fd, "HTTP/1.1 500 Internal Server Error\r\n\r\n", 36);
+                return;
+            }
         }
+
         write(client_fd, "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nPOST Received!", 52);
     }
     else {
