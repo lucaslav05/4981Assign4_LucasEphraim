@@ -91,8 +91,6 @@ void handle_request(int client_fd, DBM *db) {
     }
     buffer[bytes_read] = '\0';  // Null-terminate the buffer to make it a valid string
 
-    printf("Worker Handling request: %d\n", getpid());
-
     // Check if it is a GET request
     if (strncmp(buffer, "GET ", 4) == 0) {
         char *file_path;
@@ -109,6 +107,7 @@ void handle_request(int client_fd, DBM *db) {
             // Default file if none specified.
             file_path = "index.html";
         }
+        printf("Worker Handling get request: %d\n", getpid());
         serve_file(client_fd, file_path);
     }
     else if (strncmp(buffer, "POST ", 5) == 0) {
@@ -134,6 +133,7 @@ void handle_request(int client_fd, DBM *db) {
             }
         }
 
+        printf("Worker Handling post request: %d\n", getpid());
         write(client_fd, "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nPOST Received!", 52);
     }
     else {
