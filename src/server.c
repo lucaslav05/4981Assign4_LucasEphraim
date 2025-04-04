@@ -143,6 +143,7 @@ int main(void)
         pid_t pid = fork();
         if(pid == 0)
         {    // Worker process
+            printf("Worker Process forked: %d\n", getpid());
             worker_process(server_fd, handle_request);
         }
     }
