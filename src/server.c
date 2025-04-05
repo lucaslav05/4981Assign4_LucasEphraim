@@ -89,7 +89,10 @@ void monitor_process(void)
 {
     while(1)
     {
-        wait(NULL);
+        while(waitpid(-1, NULL, WNOHANG) > 0)
+        {
+        }
+        sleep(1);
     }
 }
 
