@@ -16,6 +16,10 @@
 #define LIBRARY_PATH "../src/libhttp.so"
 #define DBM_MODE 0666
 
+#ifdef __APPLE__
+    #define SOCK_CLOEXEC 0
+#endif
+
 typedef void (*handle_request_t)(int client_fd, DBM *db);
 
 static handle_request_t load_shared_library(void);
