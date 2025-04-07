@@ -106,7 +106,7 @@ int main(void)
     struct sockaddr_in server_addr;
 
     // Create server socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if(server_fd < 0)
     {
         perror("Socket creation failed");
