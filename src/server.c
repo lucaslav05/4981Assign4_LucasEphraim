@@ -11,7 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define PORT 8080
+#define PORT 8123
 #define MAX_WORKERS 3
 #define LIBRARY_PATH "../src/libhttp.so"
 #define DBM_MODE 0666
