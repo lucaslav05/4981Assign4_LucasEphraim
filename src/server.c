@@ -16,9 +16,9 @@
 #define LIBRARY_PATH "../src/libhttp.so"
 #define DBM_MODE 0666
 
-#ifdef __APPLE__
-    #define SOCK_CLOEXEC 0
-#endif
+// #ifdef __APPLE__
+//     #define SOCK_CLOEXEC 0
+// #endif
 
 typedef void (*handle_request_t)(int client_fd, DBM *db);
 
@@ -110,7 +110,8 @@ int main(void)
     struct sockaddr_in server_addr;
 
     // Create server socket
-    server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    //    server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_fd < 0)
     {
         perror("Socket creation failed");
