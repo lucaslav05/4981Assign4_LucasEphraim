@@ -18,8 +18,8 @@ int main() {
     while (key.dptr != NULL) {
         datum value = dbm_fetch(db, key);
         if (value.dptr) {
-            printf("Key: %.*s\n", key.dsize, key.dptr);
-            printf("Value: %.*s\n\n", value.dsize, value.dptr);
+            printf("Key: %.*s\n", (int)key.dsize, key.dptr);
+            printf("Value: %.*s\n\n", (int)value.dsize, value.dptr);
         }
 
         key = dbm_nextkey(db);
