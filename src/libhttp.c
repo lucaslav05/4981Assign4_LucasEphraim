@@ -118,20 +118,21 @@ void handle_request(int client_fd, DBM *db) {
         snprintf(key_str, sizeof(key_str), "post_%ld", now);
 
         key.dptr = key_str;
-        key.dsize = (int)strlen(key_str);
+        key.dsize = (size_t)strlen(key_str);
         value.dptr = buffer;
-        value.dsize = (int)bytes_read;
+        value.dsize = (size_t)bytes_read;
 
         if (dbm_store(db, key, value, DBM_INSERT) < 0) {
             // Fallback in case of key collision
             snprintf(key_str, sizeof(key_str), "post_%ld_%d", now, rand() % 10000);
             key.dptr = key_str;
-            key.dsize = (int)strlen(key_str);
+            key.dsize = (size_t)strlen(key_str);
             if (dbm_store(db, key, value, DBM_INSERT) < 0) {
                 write(client_fd, "HTTP/1.1 500 Internal Server Error\r\n\r\n", 36);
                 return;
             }
         }
+        dbm_close(db);
 
         printf("Worker Handling post request: %d\n", getpid());
         write(client_fd, "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nPOST Received!", 52);
