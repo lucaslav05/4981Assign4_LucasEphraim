@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <ndbm.h>
 #include <time.h>
+#include <stddef.h>
+#include <errno.h>
 
 #define MEDIA_FOLDER "../media/"
 
@@ -38,12 +40,14 @@ void serve_file(int client_fd, const char *file_path) {
     char full_path[1024];
     int file_fd;
     struct stat file_stat;
-    char *dot;
+    char *mime_type_seperator;;
     const char *mime_type;
     char header[512];
     int header_len;
     char buffer[4096];
     ssize_t bytes_read;
+    ssize_t header_bytes_sent;
+    ssize_t content_bytes_sent;
 
     snprintf(full_path, sizeof(full_path), "%s%s", MEDIA_FOLDER, file_path);
 
@@ -54,6 +58,7 @@ void serve_file(int client_fd, const char *file_path) {
         return;
     }
 
+    //Checks validity of file descriptor and sends, the clinet, error code 500 if fd does not pass the check.
     if (fstat(file_fd, &file_stat) == -1) {
         const char *server_error = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 25\r\n\r\n500 Internal Server Error";
         write(client_fd, server_error, strlen(server_error));
@@ -62,8 +67,9 @@ void serve_file(int client_fd, const char *file_path) {
     }
 
     // Extract file extension for MIME type determination.
-    dot = strrchr(file_path, '.');
-    mime_type = (dot) ? get_mime_type(dot + 1) : "application/octet-stream";
+    mime_type_seperator = strrchr(file_path, '.');
+
+    mime_type = (mime_type_seperator) ? get_mime_type(++mime_type_seperator) : "application/octet-stream";
 
     // Build and send the HTTP header.
     header_len = snprintf(header, sizeof(header),
@@ -73,12 +79,41 @@ void serve_file(int client_fd, const char *file_path) {
                               "Connection: close\r\n"
                               "\r\n",
                               mime_type, (long)file_stat.st_size);
-    write(client_fd, header, (size_t)header_len);
+
+    // Send header to the client first
+    header_bytes_sent = write(client_fd, header, (size_t)header_len);
+
+    if (header_bytes_sent < 0)
+    {
+        perror("Header not sent to client");
+        close(client_fd);
+        close(file_fd);
+    }
 
     // Stream the file contents.
-    while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-        write(client_fd, buffer, (size_t)bytes_read);
+    while (1) {
+        bytes_read = read(file_fd, buffer, sizeof(buffer));
+        if (bytes_read == -1) {
+            if (errno == EINTR) {
+                continue; // Try again
+            } else {
+                perror("read failed");
+                break;
+            }
+        }
+        if (bytes_read == 0) {
+            break; // EOF
+        }
+
+        content_bytes_sent = write(client_fd, buffer, (size_t)bytes_read);
+        if (content_bytes_sent != (size_t)bytes_read)
+        {
+            perror("Write failed");
+            close(client_fd);
+            break;
+        {
     }
+
     close(file_fd);
 }
 
