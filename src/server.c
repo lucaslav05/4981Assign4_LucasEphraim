@@ -2,6 +2,8 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <ndbm.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,11 +22,20 @@
     #define SOCK_CLOEXEC 0
 #endif
 
+static volatile sig_atomic_t keep_looping = 1;    // NOLINT
+
 typedef void (*handle_request_t)(int client_fd, DBM *db);
 
 static handle_request_t load_shared_library(void);
 static void             worker_process(int server_fd, handle_request_t handle_request) __attribute__((noreturn));
 static void             monitor_process(void) __attribute__((noreturn));
+void                    handle_shutdown(int sig);
+
+void handle_shutdown(int sig)
+{
+    (void)sig;
+    keep_looping = 0;
+}
 
 handle_request_t load_shared_library(void)
 {
@@ -69,7 +80,7 @@ void worker_process(int server_fd, handle_request_t handle_request)
         exit(EXIT_FAILURE);
     }
 
-    while(1)
+    while(keep_looping)
     {
         int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
         if(client_fd < 0)
@@ -86,18 +97,22 @@ void worker_process(int server_fd, handle_request_t handle_request)
 
         close(client_fd);
     }
+    dbm_close(db);
+    close(server_fd);
+    exit(0);
 }
 
 // Monitor process to reap zombie processes
 void monitor_process(void)
 {
-    while(1)
+    while(keep_looping)
     {
         while(waitpid(-1, NULL, WNOHANG) > 0)
         {
+            sleep(1);
         }
-        sleep(1);
     }
+    exit(0);
 }
 
 // Main function
@@ -108,6 +123,10 @@ int main(void)
     int                server_fd;
     int                opt = 1;
     struct sockaddr_in server_addr;
+    pid_t              worker_id_array[MAX_WORKERS];
+
+    signal(SIGINT, handle_shutdown);
+    signal(SIGTERM, handle_shutdown);
 
     // Create server socket
     server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
@@ -167,14 +186,23 @@ int main(void)
         pid_t pid = fork();
         if(pid == 0)
         {    // Worker process
-            printf("Worker Process forked: %d\n", getpid());
+            printf("Worker Process forked, worker id: %d\n", getpid());
             worker_process(server_fd, handle_request);
         }
+        worker_id_array[i] = pid;
     }
 
     // Main server process just waits (monitor handles cleanup)
-    while(1)
+    while(keep_looping)
     {
         sleep(1);
+    }
+
+    printf("Server exiting...\n");
+    kill(monitor_pid, SIGTERM);
+
+    for(int i = 0; i < MAX_WORKERS; i++)
+    {
+        kill(worker_id_array[i], SIGTERM);
     }
 }
