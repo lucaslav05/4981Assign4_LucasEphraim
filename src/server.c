@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <ndbm.h>
 #include <signal.h>
@@ -73,30 +74,59 @@ void worker_process(int server_fd, handle_request_t handle_request)
     char               key_str[]  = "post_data";
     DBM               *db         = dbm_open(key_str, O_RDWR | O_CREAT, DBM_MODE);
     key_str[1]                    = 'h';
-
     if(!db)
     {
         perror("Failed to open ndbm database");
         exit(EXIT_FAILURE);
     }
-
     while(keep_looping)
     {
-        int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+        struct timeval timeout;
+        fd_set         read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(server_fd, &read_fds);
+        int ready;
+        int client_fd;
+
+        timeout.tv_sec  = 1;
+        timeout.tv_usec = 0;
+
+        ready = select(server_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if(ready < 0)
+        {
+            if(errno == EINTR)
+                continue;
+
+            if(!keep_looping || errno == EBADF)
+                break;
+
+            perror("select failed");
+            continue;
+        }
+
+        if(ready == 0)
+            continue;    // timeout — just loop back and check keep_looping
+
+        // ready > 0 and server_fd is ready to accept
+        client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
         if(client_fd < 0)
         {
+            if(errno == EINTR)
+                continue;
+
+            if(!keep_looping || errno == EBADF || errno == ENOTSOCK)
+                break;
+
             perror("Accept failed");
             continue;
         }
 
-        // Reload shared library if updated
+        // Reload and handle
         handle_request = load_shared_library();
-
-        // Process HTTP request
         handle_request(client_fd, db);
-
         close(client_fd);
     }
+
     dbm_close(db);
     close(server_fd);
     exit(0);
