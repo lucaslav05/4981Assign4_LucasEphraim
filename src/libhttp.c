@@ -131,18 +131,23 @@ void handle_request(int client_fd, DBM *db) {
     if (strncmp(buffer, "GET ", 4) == 0) {
         char *file_path;
         // Parse the GET request to extract the requested path.
-        char method[8], path[1024], protocol[16];
+        char method[8];
+        char path[1024];
+        char protocol[16];
+
         if (sscanf(buffer, "%7s %1023s %15s", method, path, protocol) != 3) {
             const char *bad_request = "HTTP/1.1 400 Bad Request\r\nContent-Length: 15\r\n\r\n400 Bad Request";
             write(client_fd, bad_request, strlen(bad_request));
             return;
         }
         // Skip the leading '/' if present.
-        file_path = (path[0] == '/') ? path + 1 : path;
+        file_path = (path[0] == '/') ? ++path : path;
+
         if (strlen(file_path) == 0) {
             // Default file if none specified.
             file_path = "index.html";
         }
+
         printf("Worker Handling get request: %d\n", getpid());
         serve_file(client_fd, file_path);
     }
@@ -151,6 +156,7 @@ void handle_request(int client_fd, DBM *db) {
         datum value;
         time_t now = time(NULL);
         char key_str[64];
+
         snprintf(key_str, sizeof(key_str), "post_%ld", now);
 
         key.dptr = key_str;
@@ -168,7 +174,6 @@ void handle_request(int client_fd, DBM *db) {
                 return;
             }
         }
-        dbm_close(db);
 
         printf("Worker Handling post request: %d\n", getpid());
         write(client_fd, "HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\nPOST Received!", 52);
