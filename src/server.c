@@ -74,6 +74,10 @@ void worker_process(int server_fd, handle_request_t handle_request)
     char               key_str[]  = "post_data";
     DBM               *db         = dbm_open(key_str, O_RDWR | O_CREAT, DBM_MODE);
     key_str[1]                    = 'h';
+
+    signal(SIGINT, handle_shutdown);
+    signal(SIGTERM, handle_shutdown);
+
     if(!db)
     {
         perror("Failed to open ndbm database");
@@ -82,11 +86,11 @@ void worker_process(int server_fd, handle_request_t handle_request)
     while(keep_looping)
     {
         struct timeval timeout;
+        int            ready;
+        int            client_fd;
         fd_set         read_fds;
         FD_ZERO(&read_fds);
         FD_SET(server_fd, &read_fds);
-        int ready;
-        int client_fd;
 
         timeout.tv_sec  = 1;
         timeout.tv_usec = 0;
@@ -95,30 +99,40 @@ void worker_process(int server_fd, handle_request_t handle_request)
         if(ready < 0)
         {
             if(errno == EINTR)
+            {
                 continue;
-
+            }
             if(!keep_looping || errno == EBADF)
+            {
                 break;
-
+            }
             perror("select failed");
-            continue;
+            {
+                continue;
+            }
         }
 
         if(ready == 0)
+        {
             continue;    // timeout — just loop back and check keep_looping
-
+        }
         // ready > 0 and server_fd is ready to accept
         client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+
         if(client_fd < 0)
         {
             if(errno == EINTR)
+            {
                 continue;
-
+            }
             if(!keep_looping || errno == EBADF || errno == ENOTSOCK)
+            {
                 break;
-
+            }
             perror("Accept failed");
-            continue;
+            {
+                continue;
+            }
         }
 
         // Reload and handle
@@ -135,6 +149,9 @@ void worker_process(int server_fd, handle_request_t handle_request)
 // Monitor process to reap zombie processes
 void monitor_process(void)
 {
+    signal(SIGINT, handle_shutdown);
+    signal(SIGTERM, handle_shutdown);
+
     while(keep_looping)
     {
         while(waitpid(-1, NULL, WNOHANG) > 0)

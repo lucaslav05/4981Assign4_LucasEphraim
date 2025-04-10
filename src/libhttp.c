@@ -175,6 +175,7 @@ void handle_request(int client_fd, DBM *db)
 
         if (dbm_store(db, key, value, DBM_INSERT) < 0)
         {
+
             // Fallback in case of key collision
             snprintf(key_str, sizeof(key_str), "post_%ld_%d", now, rand() % 10000);
             key.dptr = key_str;
