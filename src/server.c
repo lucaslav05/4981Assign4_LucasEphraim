@@ -63,7 +63,7 @@ handle_request_t load_shared_library(void)
         exit(EXIT_FAILURE);
     }
 
-//    printf("Loaded shared library: %s\n", LIBRARY_PATH);
+    //    printf("Loaded shared library: %s\n", LIBRARY_PATH);
     return handle_request;
 }
 

@@ -131,7 +131,7 @@ void handle_request(int client_fd, DBM *db)
     }
     buffer[bytes_read] = '\0';  // Null-terminate the buffer to make it a valid string
 
-    printf("test dynamic library\n");
+//    printf("test dynamic library\n");
     // Check if it is a GET request
     if (strncmp(buffer, "GET ", 4) == 0)
     {
