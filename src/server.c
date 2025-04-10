@@ -90,8 +90,10 @@ void worker_process(int server_fd, handle_request_t handle_request)
         int            ready;
         int            client_fd;
         fd_set         read_fds;
-        FD_ZERO(&read_fds);
-        FD_SET(server_fd, &read_fds);
+
+        memset(&read_fds, 0, sizeof(read_fds));
+		FD_SET(server_fd, &read_fds);
+
 
         timeout.tv_sec  = 0;
         timeout.tv_usec = SELECT_CHECK;
