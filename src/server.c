@@ -63,7 +63,7 @@ handle_request_t load_shared_library(void)
         exit(EXIT_FAILURE);
     }
 
-    printf("Loaded shared library: %s\n", LIBRARY_PATH);
+//    printf("Loaded shared library: %s\n", LIBRARY_PATH);
     return handle_request;
 }
 
@@ -133,6 +133,10 @@ void worker_process(int server_fd, handle_request_t handle_request)
 
         if(client_fd < 0)
         {
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                continue;    // Normal in non-blocking mode
+            }
             if(errno == EINTR)
             {
                 continue;
@@ -150,7 +154,7 @@ void worker_process(int server_fd, handle_request_t handle_request)
         // Reload and handle
         handle_request = load_shared_library();
         handle_request(client_fd, db);
-        close(client_fd);
+        //        close(client_fd);
     }
 
     dbm_close(db);
@@ -189,12 +193,22 @@ int main(void)
     int                opt = 1;
     struct sockaddr_in server_addr;
     pid_t              worker_id_array[MAX_WORKERS];
+    int                flags;
 
     signal(SIGINT, handle_shutdown);
     signal(SIGTERM, handle_shutdown);
 
     // Create server socket
     server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+
+    // Make the server_fd non-blocking
+    flags = fcntl(server_fd, F_GETFL, 0);
+    if(flags == -1 || fcntl(server_fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        perror("Failed to make server socket non-blocking");
+        exit(EXIT_FAILURE);
+    }
+
     //    server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_fd < 0)
     {

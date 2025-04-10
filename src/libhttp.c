@@ -130,7 +130,7 @@ void handle_request(int client_fd, DBM *db)
         return;  // Error or empty request
     }
     buffer[bytes_read] = '\0';  // Null-terminate the buffer to make it a valid string
-	
+
     printf("test dynamic library\n");
     // Check if it is a GET request
     if (strncmp(buffer, "GET ", 4) == 0)
@@ -156,7 +156,7 @@ void handle_request(int client_fd, DBM *db)
             file_path = "index.html";
         }
 
-        printf("Worker Handling get request: %d\n", getpid());
+        printf("Worker Handling get request, worker id: %d\n", getpid());
         serve_file(client_fd, file_path);
     }
     else if (strncmp(buffer, "POST ", 5) == 0)
