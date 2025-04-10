@@ -18,6 +18,7 @@
 #define MAX_WORKERS 3
 #define LIBRARY_PATH "../src/libhttp.so"
 #define DBM_MODE 0666
+#define SELECT_CHECK 100000
 
 #ifdef __APPLE__
     #define SOCK_CLOEXEC 0
@@ -92,8 +93,13 @@ void worker_process(int server_fd, handle_request_t handle_request)
         FD_ZERO(&read_fds);
         FD_SET(server_fd, &read_fds);
 
-        timeout.tv_sec  = 1;
-        timeout.tv_usec = 0;
+        timeout.tv_sec  = 0;
+        timeout.tv_usec = SELECT_CHECK;
+
+        if(!keep_looping)
+        {
+            break;
+        }
 
         ready = select(server_fd + 1, &read_fds, NULL, NULL, &timeout);
         if(ready < 0)
@@ -118,6 +124,12 @@ void worker_process(int server_fd, handle_request_t handle_request)
         }
         // ready > 0 and server_fd is ready to accept
         client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+
+        if(!keep_looping)
+        {
+            close(client_fd);
+            break;
+        }
 
         if(client_fd < 0)
         {
@@ -156,9 +168,15 @@ void monitor_process(void)
     {
         while(waitpid(-1, NULL, WNOHANG) > 0)
         {
-            sleep(1);
         }
+        sleep(1);
     }
+
+    // Reap any leftovers before exiting
+    while(waitpid(-1, NULL, WNOHANG) > 0)
+    {
+    }
+
     exit(0);
 }
 
@@ -217,13 +235,6 @@ int main(void)
 
     printf("Server listening on port %d...\n", PORT);
 
-    // Fork monitor process
-    monitor_pid = fork();
-    if(monitor_pid == 0)
-    {
-        monitor_process();
-    }
-
     // Load shared library once before forking
     handle_request = load_shared_library();
 
@@ -239,6 +250,13 @@ int main(void)
         worker_id_array[i] = pid;
     }
 
+    // Fork monitor process
+    monitor_pid = fork();
+    if(monitor_pid == 0)
+    {
+        monitor_process();
+    }
+
     // Main server process just waits (monitor handles cleanup)
     while(keep_looping)
     {
@@ -246,10 +264,22 @@ int main(void)
     }
 
     printf("Server exiting...\n");
+
+    // 1. Kill monitor
     kill(monitor_pid, SIGTERM);
 
+    // 2. Kill and reap workers
     for(int i = 0; i < MAX_WORKERS; i++)
     {
         kill(worker_id_array[i], SIGTERM);
     }
+    for(int i = 0; i < MAX_WORKERS; i++)
+    {
+        waitpid(worker_id_array[i], NULL, 0);
+        printf("Reaped worker %d\n", worker_id_array[i]);
+    }
+
+    // 3. Reap monitor last
+    waitpid(monitor_pid, NULL, 0);
+    printf("Reaped monitor %d\n", monitor_pid);
 }

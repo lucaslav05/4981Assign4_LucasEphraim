@@ -195,4 +195,6 @@ void handle_request(int client_fd, DBM *db)
         // Handle unsupported methods
         write(client_fd, "HTTP/1.1 405 Method Not Allowed\r\n\r\n", 36);
     }
+
+    close(client_fd);
 }
